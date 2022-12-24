@@ -1,13 +1,95 @@
-body {
+@import url("https://fonts.googleapis.com/css2?family=Poppins&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+html {
+  height: 100%;
+}
+
+body {
+  height: 100%;
+}
+
+body:has(.dark) {
+  background-color: rgb(24, 24, 27);
+}
+
+#root {
+  height: 100%;
+}
+
+.input-error {
+  border-color: red !important;
+  border: 1px solid red;
+}
+
+.loader {
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 3px solid #fff;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  box-sizing: border-box;
+  animation: rotation 1s linear infinite;
+}
+
+@keyframes rotation {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+input[type="checkbox"].toggle {
+  opacity: 0;
+  position: absolute;
+  left: -9000px;
+  top: -9000px;
+}
+
+input[type="checkbox"].toggle + label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+input[type="checkbox"].toggle + label::before {
+  content: "";
+  width: 2.25em;
+  height: 1.25em;
+  background-color: rgb(226, 232, 240);
+  border-radius: 1em;
+  transition: 200ms ease-in-out;
+}
+
+input[type="checkbox"].toggle + label::after {
+  position: absolute;
+  left: 0.125rem;
+  content: "";
+  width: 1em;
+  height: 1em;
+  background-color: white;
+  border-radius: 1em;
+  transition: 200ms ease-in-out;
+}
+
+input[type="checkbox"].toggle:checked + label::before {
+  background: linear-gradient(to right, #a855f7, #3b82f6);
+}
+
+input[type="checkbox"].toggle:checked + label::after {
+  transform: translateX(100%);
+  background-color: white;
 }
