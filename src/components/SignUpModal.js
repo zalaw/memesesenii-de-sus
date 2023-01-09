@@ -1,51 +1,53 @@
+import { useState } from "react";
+import { useFormik } from "formik";
 import { MdClose } from "react-icons/md";
+
 import Modal from "./Modal";
 import CustomButton from "./CustomButton";
-import { setShowSignInModal, setShowSignUpModal } from "../features/ui/uiSlice";
 import CustomInput from "./CustomInput";
-import { useFormik } from "formik";
-import { signUpSchema } from "../schemas";
-import { useState } from "react";
 import CustomAlert from "./CustomAlert";
+
 import { useAuth } from "../contexts/AuthContext";
-import { useDispatch } from "react-redux";
+import { signUpSchema } from "../schemas";
 import { addDoc, collection } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
-const SignUpModal = () => {
+const SignUpModal = ({ handlers }) => {
   const { signup, updateDisplayName, logout, sendVerificationEmail } = useAuth();
-  const dispatch = useDispatch();
 
-  const [firebaseMessage, setFirebaseMessage] = useState({ type: null, title: null, body: null });
+  const [message, setMessage] = useState({ type: null, title: null, body: null });
 
-  const onSubmit = async (values, actions) => {
-    setFirebaseMessage({ type: null, title: null, body: null });
+  const handleShowSignInModal = () => {
+    handlers.setShowSignUpModal(false);
+    handlers.setShowSignInModal(true);
+  };
+
+  const onSubmit = async values => {
+    setMessage({ type: null, title: null, body: null });
 
     try {
       await signup(values.email, values.password);
       await updateDisplayName(values.username);
-      await addDoc(collection(db, "users"), { uid: auth.currentUser.uid, memes: [] });
+      await addDoc(collection(db, "users"), {
+        userId: auth.currentUser.uid,
+        displayName: values.username,
+        avatar: null,
+        avatarFileName: null,
+        memes: [],
+      });
       await sendVerificationEmail();
       await logout();
 
-      setFirebaseMessage({
+      setMessage({
         type: "success",
         title: "Account created successfully",
-        body: "Verify your email before singning in",
+        body: "Verify your email before signin in",
       });
-
-      actions.resetForm();
     } catch (err) {
-      console.log(err.code);
-      if (err.code === "auth/email-already-in-use")
-        setFirebaseMessage({ type: "error", title: "Email already in use" });
-      else setFirebaseMessage({ type: "error", title: "Unknown error. Try again later" });
+      console.log(JSON.stringify(err, null, 2));
+      if (err.code === "auth/email-already-in-use") setMessage({ type: "error", title: "Email already in use" });
+      else setMessage({ type: "error", title: "Unknown error. Try again later" });
     }
-  };
-
-  const handleShowSignInModal = () => {
-    dispatch(setShowSignUpModal(false));
-    dispatch(setShowSignInModal(true));
   };
 
   const { values, errors, touched, isSubmitting, handleBlur, handleChange, handleSubmit } = useFormik({
@@ -100,7 +102,7 @@ const SignUpModal = () => {
 
         <button
           tabIndex={0}
-          onClick={() => dispatch(setShowSignUpModal(false))}
+          onClick={() => handlers.setShowSignUpModal(false)}
           className="dark:hover:bg-zinc-700 hover:bg-slate-200 text-xl p-2 cursor-pointer"
         >
           <MdClose />
@@ -130,9 +132,7 @@ const SignUpModal = () => {
               );
             })}
 
-            {firebaseMessage.type && (
-              <CustomAlert type={firebaseMessage.type} title={firebaseMessage.title} body={firebaseMessage.body} />
-            )}
+            {message.type && <CustomAlert type={message.type} title={message.title} body={message.body} />}
 
             <CustomButton type="submit" loading={isSubmitting} text="Sign up" primary={true} className="mt-4" />
           </div>

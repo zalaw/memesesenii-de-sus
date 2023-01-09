@@ -6,10 +6,10 @@ import "react-image-crop/dist/ReactCrop.css";
 import { MdOutlineRotateLeft, MdOutlineRotateRight, MdZoomOut, MdZoomIn } from "react-icons/md";
 import CustomButton from "./CustomButton";
 import { deleteObject, getDownloadURL, listAll, ref, uploadBytesResumable } from "firebase/storage";
-import { auth, storage } from "../firebase";
+import { auth, db, storage } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { updateProfile } from "firebase/auth";
-import { deleteDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, query, updateDoc, where } from "firebase/firestore";
 
 const ImagePreview = ({ src, handleClose }) => {
   const imgRef = useRef();
@@ -22,7 +22,6 @@ const ImagePreview = ({ src, handleClose }) => {
   const [rotate, setRotate] = useState(0);
   const [aspect, setAspect] = useState(1 / 1);
   const [loading, setLoading] = useState(false);
-  const [test, setTest] = useState(["babajee"]);
 
   function centerAspectCrop(mediaWidth, mediaHeight, aspect) {
     return centerCrop(
@@ -41,7 +40,6 @@ const ImagePreview = ({ src, handleClose }) => {
   }
 
   function getCroppedImg() {
-    setTest(prev => [...prev, "loadingTrue"]);
     setLoading(true);
 
     const image = imgRef.current;
@@ -75,17 +73,9 @@ const ImagePreview = ({ src, handleClose }) => {
     ctx.drawImage(image, 0, 0, image.naturalWidth, image.naturalHeight, 0, 0, image.naturalWidth, image.naturalHeight);
     ctx.restore();
 
-    setTest(prev => [...prev, "before canvas.toBlob"]);
-
     canvas.toBlob(async blob => {
-      setTest(prev => [...prev, "canvas.toBlob 1"]);
-
-      setTest(prev => [...prev, currentUser.uid]);
-      setTest(prev => [...prev, crypto.randomUUID()]);
-
-      const storageRef = ref(storage, `avatars/${currentUser.uid}/${crypto.randomUUID()}`);
-
-      console.log("hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+      const fileName = crypto.randomUUID();
+      const storageRef = ref(storage, `avatars/${currentUser.uid}/${fileName}`);
 
       const { items } = await listAll(ref(storage, `avatars/${currentUser.uid}`));
 
@@ -93,50 +83,34 @@ const ImagePreview = ({ src, handleClose }) => {
         await deleteObject(item);
       }
 
-      setTest(prev => [...prev, "beforeUploadTask"]);
-
       const uploadTask = uploadBytesResumable(storageRef, blob, { contentType: blob.type });
 
       uploadTask.on(
         "state_changed",
-        snapshot => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-
-          setTest(prev => [...prev, progress]);
-
-          switch (snapshot.state) {
-            case "paused":
-              console.log("Upload is paused");
-              setTest(prev => [...prev, "Upload is paused"]);
-              break;
-            case "running":
-              console.log("Upload is running");
-              setTest(prev => [...prev, "Upload is running"]);
-              break;
-            default:
-              console.log("default");
-              setTest(prev => [...prev, "Upload is default"]);
-          }
-        },
+        snapshot => {},
         error => {
           console.log(error);
           console.log(JSON.stringify(error, null, 2));
-          setTest(prev => [...prev, JSON.stringify(error, null, 2)]);
           setLoading(false);
         },
         async () => {
-          const url = await getDownloadURL(uploadTask.snapshot.ref);
-          setTest(prev => [...prev, url]);
+          try {
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
 
-          await updateProfile(auth.currentUser, { photoURL: url });
+            await updateProfile(auth.currentUser, { photoURL: url });
+            await updateDoc(doc(db, "users", currentUser.firestoreId), { avatar: url, avatarFileName: fileName });
 
-          setCurrentUser(prev => ({
-            ...prev,
-            photoURL: url,
-          }));
-          setLoading(false);
-          setTest(prev => [...prev, "loadingFalse"]);
-          // handleClose();
+            setCurrentUser(prev => ({
+              ...prev,
+              photoURL: url,
+            }));
+
+            handleClose();
+          } catch (err) {
+            console.log(err);
+          } finally {
+            setLoading(false);
+          }
         }
       );
     });
@@ -153,13 +127,7 @@ const ImagePreview = ({ src, handleClose }) => {
     <Modal width={"sm:max-w-xl"}>
       <div className="select-none">
         <div className="p-2 sm:p-4 text-center">Update profile picture</div>
-        <div>
-          {test.map((x, index) => (
-            <p key={index} className="mb-8">
-              {x}
-            </p>
-          ))}
-        </div>
+
         <div className="bg-zinc-900 cursor-grabbing flex justify-center overflow-auto px-4">
           <ReactCrop
             crop={crop}

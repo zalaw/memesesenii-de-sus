@@ -1,58 +1,53 @@
 import { useState } from "react";
-import { MdClose } from "react-icons/md";
-import Modal from "./Modal";
-import CustomButton from "./CustomButton";
-import { useDispatch } from "react-redux";
-import { setShowSignInModal, setShowSignUpModal, setShowForgotPasswordModal } from "../features/ui/uiSlice";
-import CustomInput from "./CustomInput";
 import { useFormik } from "formik";
-import { signInSchema } from "../schemas";
-import CustomAlert from "./CustomAlert";
-import { useAuth } from "../contexts/AuthContext";
+import { MdClose } from "react-icons/md";
 import { toast } from "react-toastify";
 
-const SignInModal = () => {
+import Modal from "./Modal";
+import CustomButton from "./CustomButton";
+import CustomInput from "./CustomInput";
+import CustomAlert from "./CustomAlert";
+
+import { useAuth } from "../contexts/AuthContext";
+import { signInSchema } from "../schemas";
+
+const SignInModal = ({ handlers }) => {
   const { signin, logout } = useAuth();
-  const dispatch = useDispatch();
 
-  const [firebaseMessage, setFirebaseMessage] = useState({ type: null, title: null, body: null });
+  const [message, setMessage] = useState({ type: null, title: null, body: null });
 
-  const onSubmit = async (values, actions) => {
-    setFirebaseMessage({ type: null, title: null, body: null });
+  const handleShowForgotPasswordModal = () => {
+    handlers.setShowSignInModal(false);
+    handlers.setShowForgotPasswordModal(true);
+  };
+
+  const handleShowSignUpModal = () => {
+    handlers.setShowSignInModal(false);
+    handlers.setShowSignUpModal(true);
+  };
+
+  const onSubmit = async values => {
+    setMessage({ type: null, title: null, body: null });
 
     try {
       const userCredential = await signin(values.email, values.password);
 
       if (!userCredential.user.emailVerified) {
         await logout();
-        setFirebaseMessage({
+        setMessage({
           type: "error",
           title: "This email is not verified",
           body: "Check your inbox (or spam) for further information",
         });
       } else {
-        dispatch(setShowSignInModal(false));
         toast.success(`Successfully logged in!`);
       }
-
-      actions.validateForm();
     } catch (err) {
       if (["auth/wrong-password", "auth/user-not-found"].includes(err.code))
-        setFirebaseMessage({ type: "error", title: "Invalid credentials" });
-      else if (err.code === "auth/user-disabled")
-        setFirebaseMessage({ type: "error", title: "This account is disabled 😳" });
-      else setFirebaseMessage({ type: "error", title: "Unknown error. Try again later" });
+        setMessage({ type: "error", title: "Invalid credentials" });
+      else if (err.code === "auth/user-disabled") setMessage({ type: "error", title: "This account is disabled 😳" });
+      else setMessage({ type: "error", title: "Unknown error. Try again later" });
     }
-  };
-
-  const handleShowSignUpModal = () => {
-    dispatch(setShowSignInModal(false));
-    dispatch(setShowSignUpModal(true));
-  };
-
-  const handleShowForgotPasswordModal = () => {
-    dispatch(setShowSignInModal(false));
-    dispatch(setShowForgotPasswordModal(true));
   };
 
   const { values, errors, touched, isSubmitting, handleBlur, handleChange, handleSubmit } = useFormik({
@@ -93,7 +88,7 @@ const SignInModal = () => {
 
         <button
           tabIndex={0}
-          onClick={() => dispatch(setShowSignInModal(false))}
+          onClick={() => handlers.setShowSignInModal(false)}
           className="dark:hover:bg-zinc-700 hover:bg-slate-200 text-xl p-2 cursor-pointer"
         >
           <MdClose />
@@ -123,9 +118,7 @@ const SignInModal = () => {
               );
             })}
 
-            {firebaseMessage.type && (
-              <CustomAlert type={firebaseMessage.type} title={firebaseMessage.title} body={firebaseMessage.body} />
-            )}
+            {message.type && <CustomAlert type={message.type} title={message.title} body={message.body} />}
 
             <CustomButton type="submit" loading={isSubmitting} text="Sign in" primary={true} className="mt-4" />
           </div>

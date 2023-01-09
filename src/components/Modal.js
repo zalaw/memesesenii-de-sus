@@ -8,7 +8,7 @@ const Modal = ({ width = "", children }) => {
   // );
 
   return (
-    <div className="fixed inset-0 z-[9999] overflow-y-auto" role={"dialog"} aria-modal={true}>
+    <div className="fixed inset-0 z-[9999] overflow-y-auto h-full w-full" role={"dialog"} aria-modal={true}>
       <div className="min-h-screen px-4 text-center">
         <div className="fixed inset-0 bg-black opacity-30"></div>
         <span className="inline-block h-screen align-middle" aria-hidden="true">

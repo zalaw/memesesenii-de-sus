@@ -8,6 +8,8 @@ import CustomAlert from "../components/CustomAlert";
 import ImagePreview from "../components/ImagePreview";
 import { useFormik } from "formik";
 import { changeUsernameSchema, changeEmailSchema, changePasswordSchema } from "../schemas";
+import { ref, deleteObject } from "firebase/storage";
+import { db, storage } from "../firebase";
 
 const Settings = () => {
   const { currentUser, setCurrentUser, updateDisplayName, verifyThenUpdateEmail, reauthenticate, updateUsersPassword } =
@@ -17,20 +19,20 @@ const Settings = () => {
   const [usernameMessage, setUsernameMessage] = useState({ type: null, title: null, body: null });
   const [emailMessage, setEmailMessage] = useState({ type: null, title: null, body: null });
   const [passwordMessage, setPasswordMessage] = useState({ type: null, title: null, body: null });
+  const [deleteMessage, setDeleteMessage] = useState({ type: null, title: null, body: null });
   const [imgSrc, setImgSrc] = useState("");
 
   const allowedTypes = ["image/png", "image/jpg", "image/jpeg", "image/gif"];
 
-  const ref = useRef(null);
+  const buttonRef = useRef(null);
 
   const handleUploadProfilePicture = e => {
-    ref.current.click();
+    buttonRef.current.click();
   };
 
   function onSelectFile(e) {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      console.log(file);
 
       if (!allowedTypes.includes(file.type)) {
         return setImageMessage({
@@ -138,6 +140,30 @@ const Settings = () => {
     }
   };
 
+  const deleteAccountOnSubmit = async () => {
+    setDeleteMessage({ type: null, title: null, body: null });
+
+    try {
+      // storage, firestore and auth
+      // if (Math.random() < 0.5) throw "Reeee";
+
+      console.log(currentUser);
+
+      const avatarRef = ref(storage, `avatars/${currentUser.uid}/${currentUser.avatarFileName}`);
+      // await deleteObject(avatarRef);
+
+      // const memesRef = ref(db, `memes/${currentUser.uid}`);
+
+      console.log(avatarRef);
+      // console.log(memesRef);
+
+      console.log("deleting...");
+    } catch (err) {
+      console.log(err);
+      setDeleteMessage({ type: "error", title: "Failed to delete account", body: "More info here..." });
+    }
+  };
+
   const {
     values: usernameValues,
     errors: usernameErrors,
@@ -195,7 +221,7 @@ const Settings = () => {
           src={imgSrc}
           handleClose={() => {
             setImgSrc("");
-            ref.current.value = "";
+            buttonRef.current.value = "";
           }}
         />
       )}
@@ -223,7 +249,7 @@ const Settings = () => {
                   <input
                     type="file"
                     accept="image/png, image/jpg, image/jpeg, image/gif"
-                    ref={ref}
+                    ref={buttonRef}
                     onChange={onSelectFile}
                   />
                 </div>
@@ -360,6 +386,27 @@ const Settings = () => {
                 {passwordTouched.newPassword && passwordErrors.newPassword && <span>&nbsp;</span>}
               </div>
             </form>
+          </div>
+        </SettingsCard>
+
+        <SettingsCard>
+          <div className="flex flex-col gap-4 sm:gap-8">
+            <h1 className="text-md sm:text-2xl font-semibold flex items-center gap-4 text-red-600">Delete account</h1>
+
+            {deleteMessage.type && (
+              <CustomAlert type={deleteMessage.type} title={deleteMessage.title} body={deleteMessage.body} />
+            )}
+
+            <div className="flex flex-col gap-2 sm:gap-4">
+              <p>
+                Once you delete your account, there is no going back. Your posted memes will be lost. Please be certain.
+              </p>
+              <CustomButton
+                onClick={deleteAccountOnSubmit}
+                text="Delete your account"
+                className="danger-button bg-red-700 font-semibold hover:bg-red-500 dark:hover:bg-red-500"
+              />
+            </div>
           </div>
         </SettingsCard>
       </div>
