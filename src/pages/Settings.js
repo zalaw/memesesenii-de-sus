@@ -7,57 +7,58 @@ import { useAuth } from "../contexts/AuthContext";
 import CustomAlert from "../components/CustomAlert";
 import ImagePreview from "../components/ImagePreview";
 import { useFormik } from "formik";
-import { changeUsernameSchema, changeEmailSchema, changePasswordSchema } from "../schemas";
-import { ref, deleteObject } from "firebase/storage";
-import { db, storage } from "../firebase";
+import { changeUsernameSchema, changeEmailSchema, changePasswordSchema, deleteAccountSchema } from "../schemas";
+import { collection, deleteDoc, doc, getDoc } from "firebase/firestore";
+import { auth, db, storage } from "../firebase";
+import { setDoc } from "firebase/firestore";
+import { deleteObject, ref } from "firebase/storage";
+import { deleteUser } from "firebase/auth";
 
 const Settings = () => {
   const { currentUser, setCurrentUser, updateDisplayName, verifyThenUpdateEmail, reauthenticate, updateUsersPassword } =
     useAuth();
 
-  const [imageMessage, setImageMessage] = useState({ type: null, title: null, body: null });
-  const [usernameMessage, setUsernameMessage] = useState({ type: null, title: null, body: null });
-  const [emailMessage, setEmailMessage] = useState({ type: null, title: null, body: null });
-  const [passwordMessage, setPasswordMessage] = useState({ type: null, title: null, body: null });
-  const [deleteMessage, setDeleteMessage] = useState({ type: null, title: null, body: null });
+  const [imageMessage, setImageMessage] = useState(null);
+  const [usernameMessage, setUsernameMessage] = useState(null);
+  const [emailMessage, setEmailMessage] = useState(null);
+  const [passwordMessage, setPasswordMessage] = useState(null);
+  const [deleteMessage, setDeleteMessage] = useState(null);
   const [imgSrc, setImgSrc] = useState("");
 
   const allowedTypes = ["image/png", "image/jpg", "image/jpeg", "image/gif"];
 
   const buttonRef = useRef(null);
 
-  const handleUploadProfilePicture = e => {
-    buttonRef.current.click();
-  };
-
   function onSelectFile(e) {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
+    if (!(e.target.files && e.target.files.length > 0)) return;
 
-      if (!allowedTypes.includes(file.type)) {
-        return setImageMessage({
-          type: "error",
-          title: "Invalid file format",
-          body: "Only JPG, JPEG, PNG and GIF allowed",
-        });
-      }
+    const file = e.target.files[0];
 
-      if (file.size > 2097152) {
-        return setImageMessage({ type: "error", title: "Max size exceeded", body: "Size cannot exceed 2MB" });
-      }
-
-      setImageMessage({ type: null, title: null, body: null });
-      const reader = new FileReader();
-      reader.addEventListener("load", () => setImgSrc(reader.result?.toString() || ""));
-      reader.readAsDataURL(file);
+    if (!allowedTypes.includes(file.type)) {
+      return setImageMessage({
+        type: "error",
+        title: "Invalid file format",
+        body: "Only JPG, JPEG, PNG and GIF allowed",
+      });
     }
+
+    if (file.size > 2097152) {
+      return setImageMessage({ type: "error", title: "Max size exceeded", body: "Size cannot exceed 2MB" });
+    }
+
+    setImageMessage(null);
+
+    const reader = new FileReader();
+    reader.addEventListener("load", () => setImgSrc(reader.result?.toString() || ""));
+    reader.readAsDataURL(file);
   }
 
   const usernameOnSubmit = async (values, actions) => {
-    setUsernameMessage({ type: null, title: null, body: null });
+    setUsernameMessage(null);
 
     try {
       await updateDisplayName(values.username);
+      await setDoc(doc(db, "users", currentUser.uid), { displayName: values.username }, { merge: true });
 
       setCurrentUser(prev => ({
         ...prev,
@@ -65,6 +66,7 @@ const Settings = () => {
       }));
 
       actions.validateForm();
+
       setUsernameMessage({
         type: "success",
         title: "Username updated successfully!",
@@ -76,7 +78,7 @@ const Settings = () => {
   };
 
   const emailOnSubmit = async (values, actions) => {
-    setEmailMessage({ type: null, title: null, body: null });
+    setEmailMessage(null);
 
     try {
       await reauthenticate(currentUser.email, values.password);
@@ -107,16 +109,16 @@ const Settings = () => {
   };
 
   const passwordOnSubmit = async (values, actions) => {
-    setPasswordMessage({ type: null, title: null, body: null });
+    setPasswordMessage(null);
+
+    if (values.currentPassword === values.newPassword)
+      return setPasswordMessage({
+        type: "error",
+        title: "Password change failed",
+        body: "Passwords cannot be the same",
+      });
 
     try {
-      if (values.currentPassword === values.newPassword)
-        return setPasswordMessage({
-          type: "error",
-          title: "Password change failed",
-          body: "Passwords cannot be the same",
-        });
-
       await reauthenticate(currentUser.email, values.currentPassword);
       await updateUsersPassword(values.newPassword);
 
@@ -140,27 +142,39 @@ const Settings = () => {
     }
   };
 
-  const deleteAccountOnSubmit = async () => {
-    setDeleteMessage({ type: null, title: null, body: null });
+  const deleteAccountOnSubmit = async (values, actions) => {
+    setDeleteMessage(null);
 
     try {
-      // storage, firestore and auth
-      // if (Math.random() < 0.5) throw "Reeee";
+      await reauthenticate(currentUser.email, values.deleteCurrentPassword);
 
       console.log(currentUser);
 
-      const avatarRef = ref(storage, `avatars/${currentUser.uid}/${currentUser.avatarFileName}`);
-      // await deleteObject(avatarRef);
+      const avatarRef = ref(storage, `avatars/${currentUser.uid}/${currentUser.photoName}`);
+      if (avatarRef.name !== "null") await deleteObject(avatarRef);
 
-      // const memesRef = ref(db, `memes/${currentUser.uid}`);
+      for (const postedMeme of currentUser.postedMemes) {
+        const memeRef = ref(storage, `memes/${postedMeme.name}`);
+        if (memeRef.name !== "null") await deleteObject(memeRef);
 
-      console.log(avatarRef);
-      // console.log(memesRef);
+        await deleteDoc(postedMeme.ref);
+      }
 
-      console.log("deleting...");
+      console.log("am ajuns aici");
+
+      await deleteDoc(doc(db, "users", currentUser.uid));
+      await deleteUser(auth.currentUser);
+
+      actions.resetForm();
     } catch (err) {
       console.log(err);
-      setDeleteMessage({ type: "error", title: "Failed to delete account", body: "More info here..." });
+      if (err.code === "auth/wrong-password")
+        setDeleteMessage({
+          type: "error",
+          title: "Deletion failed",
+          body: "The password is incorrect, c'mon bruh, it's your password after all",
+        });
+      else setDeleteMessage({ type: "error", title: "Unknown error" });
     }
   };
 
@@ -214,6 +228,22 @@ const Settings = () => {
     onSubmit: passwordOnSubmit,
   });
 
+  const {
+    values: deleteValues,
+    errors: deleteErrors,
+    touched: deleteTouched,
+    isSubmitting: deleteIsSubmitting,
+    handleBlur: deleteHandleBlur,
+    handleChange: deleteHandleChange,
+    handleSubmit: deleteHandleSubmit,
+  } = useFormik({
+    initialValues: {
+      deleteCurrentPassword: "",
+    },
+    validationSchema: deleteAccountSchema,
+    onSubmit: deleteAccountOnSubmit,
+  });
+
   return (
     <>
       {imgSrc && (
@@ -231,21 +261,19 @@ const Settings = () => {
           <div className="flex flex-col gap-4 sm:gap-8">
             <h1 className="dark:text-slate-100 text-md sm:text-2xl font-semibold text-slate-700">Profile picture</h1>
 
-            {imageMessage.type && (
+            {imageMessage && (
               <CustomAlert type={imageMessage.type} title={imageMessage.title} body={imageMessage.body} />
             )}
 
             <div className="flex gap-4 items-center">
-              <UserAvatar className="w-20 aspect-square" />
+              <UserAvatar photoURL={currentUser.photoURL} className="w-20 aspect-square" />
               <div className="flex flex-col gap-2 items-start">
-                <CustomButton text={"Upload profile picture"} primary={true} onClick={handleUploadProfilePicture} />
+                <CustomButton
+                  text={"Upload profile picture"}
+                  primary={true}
+                  onClick={() => buttonRef.current.click()}
+                />
                 <div className="w-0 h-0 hidden">
-                  {/* <CustomInput
-                    value={image}
-                    ref={ref}
-                    type="file"
-                    onChange={e => setImage(URL.createObjectURL(e.target.files[0]))}
-                  /> */}
                   <input
                     type="file"
                     accept="image/png, image/jpg, image/jpeg, image/gif"
@@ -265,7 +293,7 @@ const Settings = () => {
           <div className="flex flex-col gap-4 sm:gap-8">
             <h1 className="dark:text-slate-100 text-md sm:text-2xl font-semibold text-slate-700">Username</h1>
 
-            {usernameMessage.type && (
+            {usernameMessage && (
               <CustomAlert type={usernameMessage.type} title={usernameMessage.title} body={usernameMessage.body} />
             )}
 
@@ -291,6 +319,7 @@ const Settings = () => {
                   disabled={currentUser.displayName === usernameValues.username}
                   text="Save"
                   primary={true}
+                  className="w-[4rem]"
                 />
               </div>
             </form>
@@ -303,7 +332,7 @@ const Settings = () => {
               Email
             </h1>
 
-            {emailMessage.type && (
+            {emailMessage && (
               <CustomAlert type={emailMessage.type} title={emailMessage.title} body={emailMessage.body} />
             )}
 
@@ -339,6 +368,7 @@ const Settings = () => {
                   disabled={currentUser.email === emailValues.email}
                   text="Save"
                   primary={true}
+                  className="w-[4rem]"
                 />
                 {emailTouched.email && emailErrors.email && <span>&nbsp;</span>}
               </div>
@@ -352,7 +382,7 @@ const Settings = () => {
               Change password
             </h1>
 
-            {passwordMessage.type && (
+            {passwordMessage && (
               <CustomAlert type={passwordMessage.type} title={passwordMessage.title} body={passwordMessage.body} />
             )}
 
@@ -382,7 +412,13 @@ const Settings = () => {
 
               <div className="flex flex-col gap-1 items-start text-xs sm:text-sm">
                 &nbsp;
-                <CustomButton type="submit" loading={passwordIsSubmitting} text="Save" primary={true} />
+                <CustomButton
+                  type="submit"
+                  loading={passwordIsSubmitting}
+                  text="Save"
+                  primary={true}
+                  className="w-[4rem]"
+                />
                 {passwordTouched.newPassword && passwordErrors.newPassword && <span>&nbsp;</span>}
               </div>
             </form>
@@ -393,20 +429,42 @@ const Settings = () => {
           <div className="flex flex-col gap-4 sm:gap-8">
             <h1 className="text-md sm:text-2xl font-semibold flex items-center gap-4 text-red-600">Delete account</h1>
 
-            {deleteMessage.type && (
+            <div className="flex flex-col gap-2 sm:gap-4 md:text-sm text-xs">
+              <p>
+                Once you delete your account, there is no going back. You will lose everything you possess. Please be
+                certain.
+              </p>
+            </div>
+
+            {deleteMessage && (
               <CustomAlert type={deleteMessage.type} title={deleteMessage.title} body={deleteMessage.body} />
             )}
 
-            <div className="flex flex-col gap-2 sm:gap-4">
-              <p>
-                Once you delete your account, there is no going back. Your posted memes will be lost. Please be certain.
-              </p>
-              <CustomButton
-                onClick={deleteAccountOnSubmit}
-                text="Delete your account"
-                className="danger-button bg-red-700 font-semibold hover:bg-red-500 dark:hover:bg-red-500"
-              />
-            </div>
+            <form className="flex gap-2 sm:gap-4 items-start" onSubmit={deleteHandleSubmit}>
+              <div className="w-full">
+                <CustomInput
+                  value={deleteValues.deleteCurrentPassword}
+                  onChange={deleteHandleChange}
+                  name={"deleteCurrentPassword"}
+                  type={"password"}
+                  placeholder={"Current password"}
+                  label={"Current password"}
+                  onBlur={deleteHandleBlur}
+                  error={deleteTouched.deleteCurrentPassword && deleteErrors.deleteCurrentPassword}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1 items-start text-xs sm:text-sm">
+                &nbsp;
+                <CustomButton
+                  className="danger-button bg-red-700 font-semibold hover:bg-red-500 dark:hover:bg-red-500 w-[4rem]"
+                  type="submit"
+                  loading={deleteIsSubmitting}
+                  disabled={deleteValues.deleteCurrentPassword.length === 0}
+                  text="Delete"
+                />
+              </div>
+            </form>
           </div>
         </SettingsCard>
       </div>

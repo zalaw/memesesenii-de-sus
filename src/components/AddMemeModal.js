@@ -6,20 +6,31 @@ import CustomInput from "./CustomInput";
 import CustomAlert from "./CustomAlert";
 import { auth, db, storage } from "../firebase";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import { addDoc, collection, doc, FieldValue, getDoc, serverTimestamp, where } from "firebase/firestore";
+import {
+  addDoc,
+  arrayUnion,
+  collection,
+  doc,
+  FieldValue,
+  Firestore,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+  where,
+} from "firebase/firestore";
 import { useAuth } from "../contexts/AuthContext";
 import { useMemes } from "../contexts/MemesContext";
 
 const AddMemeModal = ({ handleClose }) => {
   const [imageMessage, setImageMessage] = useState(null);
   const [image, setImage] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [percent, setPercent] = useState(10);
 
-  const { currentUser } = useAuth();
+  const { currentUser, setCurrentUser } = useAuth();
   const { addMeme } = useMemes();
 
   const fileRef = useRef(null);
-
-  console.log(currentUser);
 
   const onSelectFile = e => {
     setImageMessage(null);
@@ -37,47 +48,63 @@ const AddMemeModal = ({ handleClose }) => {
 
   const onSubmit = e => {
     e.preventDefault();
+    setLoading(true);
 
-    const storageRef = ref(storage, `memes/${crypto.randomUUID()}`);
+    const fileName = crypto.randomUUID();
+    const storageRef = ref(storage, `memes/${fileName}`);
 
     const uploadTask = uploadBytesResumable(storageRef, image);
 
     uploadTask.on(
       "state_changed",
-      () => {
-        console.log("working");
+      snapshot => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        console.log(progress);
+        setPercent(progress);
       },
       error => {
         console.log(error);
+        setLoading(false);
       },
       async () => {
-        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+        try {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          const createdAt = serverTimestamp();
 
-        // collection(db, ref => where(ref, "id", "==", currentUser.firestoreId));
+          const newDocRef = await addDoc(collection(db, "memes"), {
+            url: downloadURL,
+            createdAt: createdAt,
+            userId: currentUser.uid,
+            memeFileName: fileName,
+            user: doc(db, `users/${currentUser.uid}`),
+          });
 
-        const createdAt = serverTimestamp();
+          await setDoc(
+            doc(db, "users", currentUser.uid),
+            { postedMemes: arrayUnion({ ref: doc(db, `memes/${newDocRef.id}`), name: fileName }) },
+            { merge: true }
+          );
 
-        const newDoc = await addDoc(collection(db, "memes"), {
-          url: downloadURL,
-          createdAt: createdAt,
-          user: doc(db, `users/${currentUser.firestoreId}`),
-        });
+          const newDoc = await getDoc(newDocRef);
 
-        const data = await getDoc(newDoc);
+          addMeme({
+            id: newDoc.id,
+            url: downloadURL,
+            memeName: fileName,
+            createdAt: newDoc.data().createdAt,
+            userId: currentUser.uid,
+            user: { displayName: currentUser.displayName, photoURL: currentUser.photoURL },
+          });
 
-        console.log("created At", createdAt);
+          setCurrentUser(prev => ({ ...prev, postedMemes: [fileName, ...prev.postedMemes] }));
 
-        console.log(data);
-        console.log(data.data());
+          setLoading(false);
 
-        addMeme({
-          id: newDoc.id,
-          url: downloadURL,
-          createdAt: data.data().createdAt,
-          user: { displayName: currentUser.displayName, avatar: currentUser.photoURL },
-        });
-
-        handleClose();
+          handleClose();
+        } catch (err) {
+          setLoading(false);
+          console.log(err);
+        }
       }
     );
   };
@@ -137,9 +164,24 @@ const AddMemeModal = ({ handleClose }) => {
           </div>
         )} */}
 
+        {loading && (
+          <div className="w-full px-6 sm:px-10">
+            <div className="h-2 dark:bg-zinc-900 bg-slate-200 rounded-full relative overflow-hidden">
+              <div className="bg-green-700 absolute inset-0" style={{ width: `${percent}%` }}></div>
+            </div>
+          </div>
+        )}
+
         <div className="w-full px-6 sm:px-10">
           <form onSubmit={onSubmit}>
-            <CustomButton type="submit" disabled={!image} className="w-full" text="Post" primary={true} />
+            <CustomButton
+              loading={loading}
+              type="submit"
+              disabled={!image}
+              className="w-full"
+              text="Post"
+              primary={true}
+            />
           </form>
         </div>
       </div>

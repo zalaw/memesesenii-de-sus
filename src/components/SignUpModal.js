@@ -9,7 +9,7 @@ import CustomAlert from "./CustomAlert";
 
 import { useAuth } from "../contexts/AuthContext";
 import { signUpSchema } from "../schemas";
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc, collection, doc, setDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
 const SignUpModal = ({ handlers }) => {
@@ -26,14 +26,16 @@ const SignUpModal = ({ handlers }) => {
     setMessage({ type: null, title: null, body: null });
 
     try {
-      await signup(values.email, values.password);
+      const { user } = await signup(values.email, values.password);
+
+      console.log("user", user);
+
       await updateDisplayName(values.username);
-      await addDoc(collection(db, "users"), {
-        userId: auth.currentUser.uid,
+      await setDoc(doc(db, "users", user.uid), {
         displayName: values.username,
-        avatar: null,
-        avatarFileName: null,
-        memes: [],
+        photoURL: null,
+        photoName: null,
+        postedMemes: [],
       });
       await sendVerificationEmail();
       await logout();

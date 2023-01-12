@@ -17,7 +17,7 @@ import {
   EmailAuthProvider,
   updatePassword,
 } from "firebase/auth";
-import { query, where, collection, getDocs } from "firebase/firestore";
+import { query, where, collection, doc, getDocs, getDoc } from "firebase/firestore";
 
 const AuthContext = createContext();
 
@@ -88,18 +88,18 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async user => {
       if (user && user.emailVerified) {
-        const querySnapshot = await getDocs(
-          query(collection(db, "users"), where("userId", "==", auth.currentUser.uid))
-        );
+        const firestoreUser = await (await getDoc(doc(db, "users", user.uid))).data();
+
+        console.log(firestoreUser);
 
         setCurrentUser({
           uid: user.uid,
-          firestoreId: querySnapshot.docs[0].id,
-          avatarFileName: querySnapshot.docs[0].data().avatarFileName,
-          photoURL: user.photoURL,
           displayName: user.displayName,
           email: user.email,
           emailVerified: user.emailVerified,
+          photoURL: firestoreUser.photoURL,
+          photoName: firestoreUser.photoName,
+          postedMemes: firestoreUser.postedMemes,
         });
       } else setCurrentUser(null);
 

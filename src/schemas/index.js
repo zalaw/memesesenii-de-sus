@@ -68,3 +68,7 @@ export const changePasswordSchema = yup.object().shape({
     .matches(passwordRules, { message: "Password should be at 8-20 characters" })
     .required("This field is required"),
 });
+
+export const deleteAccountSchema = yup.object().shape({
+  deleteCurrentPassword: yup.string().required("This field is required"),
+});

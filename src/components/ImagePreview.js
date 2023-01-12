@@ -9,7 +9,7 @@ import { deleteObject, getDownloadURL, listAll, ref, uploadBytesResumable } from
 import { auth, db, storage } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { updateProfile } from "firebase/auth";
-import { collection, deleteDoc, doc, getDoc, query, updateDoc, where } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, query, setDoc, updateDoc, where } from "firebase/firestore";
 
 const ImagePreview = ({ src, handleClose }) => {
   const imgRef = useRef();
@@ -98,11 +98,13 @@ const ImagePreview = ({ src, handleClose }) => {
             const url = await getDownloadURL(uploadTask.snapshot.ref);
 
             await updateProfile(auth.currentUser, { photoURL: url });
-            await updateDoc(doc(db, "users", currentUser.firestoreId), { avatar: url, avatarFileName: fileName });
+            // await updateDoc(doc(db, "users", currentUser.firestoreId), { avatar: url, avatarFileName: fileName });
+            await setDoc(doc(db, "users", currentUser.uid), { photoURL: url, photoName: fileName }, { merge: true });
 
             setCurrentUser(prev => ({
               ...prev,
               photoURL: url,
+              photoName: fileName,
             }));
 
             handleClose();

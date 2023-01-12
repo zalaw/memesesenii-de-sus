@@ -34,7 +34,7 @@ const HeaderUserLoggedIn = () => {
 
   return (
     <button id="this-one" className="relative z-50" onClick={handleClick}>
-      <UserAvatar imgURL={currentUser.photoURL} id="this-one" />
+      <UserAvatar photoURL={currentUser.photoURL} id="this-one" />
 
       <div
         ref={ref}
@@ -43,7 +43,7 @@ const HeaderUserLoggedIn = () => {
         } absolute top-full min-w-[200px] w-max drop-shadow-lg shadow-lg dark:bg-zinc-800 dark:text-slate-200 bg-white transition right-0 px-4 mt-4 text-sm text-slate-800 font-semibold`}
       >
         <div className="flex gap-4 items-center py-4">
-          <UserAvatar />
+          <UserAvatar photoURL={currentUser.photoURL} />
           <span>{currentUser.displayName}</span>
         </div>
 
