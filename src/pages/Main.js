@@ -67,13 +67,15 @@ const Main = () => {
                   </div>
                 </div>
 
-                <div>
-                  {meme.userId === currentUser.uid && (
-                    <div onClick={() => deleteOnClick(meme)}>
-                      <CustomButton icon={<MdDelete className="text-red-700 sm:text-2xl text-lg" />} rounded={true} />
-                    </div>
-                  )}
-                </div>
+                {currentUser && (
+                  <div>
+                    {meme.userId === currentUser.uid && (
+                      <div onClick={() => deleteOnClick(meme)}>
+                        <CustomButton icon={<MdDelete className="text-red-700 sm:text-2xl text-lg" />} rounded={true} />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
