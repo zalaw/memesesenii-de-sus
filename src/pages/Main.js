@@ -1,30 +1,47 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { MdOutlineFavoriteBorder, MdOutlineComment } from "react-icons/md";
+import { MdOutlineFavoriteBorder, MdOutlineComment, MdDelete } from "react-icons/md";
 import AddMemeModal from "../components/AddMemeModal";
 import { useMemes } from "../contexts/MemesContext";
 import UserAvatar from "../components/UserAvatar";
 import CustomButton from "../components/CustomButton";
-import { formatDistance } from "date-fns";
+import { formatDistance, subDays } from "date-fns";
+import DeleteMemeModal from "../components/DeleteMemeModal";
 const Main = () => {
   const { currentUser } = useAuth();
-  const { getMemes, memes, setMemes } = useMemes();
+  const { loading, getMemes, memes, setMemes } = useMemes();
 
   const [showAddMemeModal, setShowAddMemeModal] = useState(false);
+  const [showDeleteMemeModal, setShowDeleteMemeModal] = useState(false);
+  const [memeToDelete, setMemeToDelete] = useState(null);
+
+  const deleteOnClick = meme => {
+    setMemeToDelete(meme);
+    setShowDeleteMemeModal(true);
+  };
 
   useEffect(() => {
-    console.log("hello here");
-    setMemes([]);
     getMemes();
+
+    return () => setMemes([]);
   }, []);
 
-  return (
-    <div className="test flex items-start gap-4 relative">
-      {showAddMemeModal && <AddMemeModal handleClose={() => setShowAddMemeModal(false)} />}
+  if (loading) return "Loading...";
 
-      <div className="sticky top-[112px]">
+  return (
+    <div className="test flex flex-col sm:flex-row sm:items-start gap-8 relative">
+      {showAddMemeModal && <AddMemeModal handleClose={() => setShowAddMemeModal(false)} />}
+      {showDeleteMemeModal && <DeleteMemeModal meme={memeToDelete} handleClose={() => setShowDeleteMemeModal(false)} />}
+
+      <div className="sm:sticky sm:top-[112px]">
         {currentUser && (
-          <CustomButton onClick={() => setShowAddMemeModal(true)} text="Add your meme" primary={true} rounded={true} />
+          <CustomButton
+            className="w-full"
+            onClick={() => setShowAddMemeModal(true)}
+            text="Add your meme"
+            primary={true}
+            rounded={true}
+          />
         )}
       </div>
 
@@ -35,17 +52,27 @@ const Main = () => {
               key={meme.id}
               className="rounded-md flex flex-col overflow-hidden w-full max-w-lg dark:bg-zinc-800 b bg-zinc-300 shadow-xl"
             >
-              <img src={meme.url} alt={meme.title} />
+              <img src={meme.url} alt="Super meme" />
 
-              <div className="p-4 flex flex-col gap-2">
-                <div className="flex gap-2 items-center">
-                  <UserAvatar photoURL={meme.user.photoURL} className="w-8" />
-                  <span className="t font-semibold">{meme.user.displayName}</span>
-                  <span className="">
-                    {formatDistance(new Date(meme.createdAt.seconds * 1000 - 50000), new Date(), {
-                      addSuffix: true,
-                    })}
-                  </span>
+              <div className="p-4 flex justify-between items-center gap-2">
+                <div className="flex gap-2 items-center text-xs sm:text-sm">
+                  <UserAvatar photoURL={meme.userData.photoURL} className="w-8" />
+                  <div className="sm:flex-row flex-col flex sm:gap-2 gap-1">
+                    <span className="font-semibold">{meme.userData.displayName}</span>
+                    <span className="">
+                      {formatDistance(new Date(meme.createdAt.seconds * 1000 - 50000), new Date(), {
+                        addSuffix: true,
+                      }).replace("about", "")}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  {meme.userId === currentUser.uid && (
+                    <div onClick={() => deleteOnClick(meme)}>
+                      <CustomButton icon={<MdDelete className="text-red-700 sm:text-2xl text-lg" />} rounded={true} />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

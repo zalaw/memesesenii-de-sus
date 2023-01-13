@@ -92,8 +92,7 @@ const AddMemeModal = ({ handleClose }) => {
             url: downloadURL,
             memeName: fileName,
             createdAt: newDoc.data().createdAt,
-            userId: currentUser.uid,
-            user: { displayName: currentUser.displayName, photoURL: currentUser.photoURL },
+            user: { uid: currentUser.uid, displayName: currentUser.displayName, photoURL: currentUser.photoURL },
           });
 
           setCurrentUser(prev => ({ ...prev, postedMemes: [fileName, ...prev.postedMemes] }));

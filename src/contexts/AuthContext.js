@@ -88,18 +88,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async user => {
       if (user && user.emailVerified) {
-        const firestoreUser = await (await getDoc(doc(db, "users", user.uid))).data();
-
-        console.log(firestoreUser);
+        const firestoreUser = await getDoc(doc(db, "users", user.uid));
 
         setCurrentUser({
           uid: user.uid,
-          displayName: user.displayName,
           email: user.email,
           emailVerified: user.emailVerified,
-          photoURL: firestoreUser.photoURL,
-          photoName: firestoreUser.photoName,
-          postedMemes: firestoreUser.postedMemes,
+          ...firestoreUser.data(),
         });
       } else setCurrentUser(null);
 

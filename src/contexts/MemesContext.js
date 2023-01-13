@@ -11,63 +11,44 @@ export function useMemes() {
 
 export function MemesProvider({ children }) {
   const [memes, setMemes] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   function addMeme(meme) {
     setMemes(prev => [meme, ...prev]);
   }
 
   const getMemes = async () => {
+    setLoading(true);
+
     try {
-      const memesSnapshot = await getDocs(query(collection(db, "memes"), orderBy("createdAt", "desc")));
+      const memesSnapshot = await getDocs(query(collection(db, "memes"), orderBy("createdAt", "asc")));
 
       for (const entry of memesSnapshot.docs) {
-        const memeUser = await getDoc(entry.data().user);
+        const user = await getDoc(entry.data().user);
 
         setMemes(prev => [
-          ...prev,
           {
             id: entry.id,
-            url: entry.data().url,
-            createdAt: entry.data().createdAt,
-            user: { displayName: memeUser.data().displayName, photoURL: memeUser.data().photoURL },
+            ...entry.data(),
+            userData: {
+              displayName: user.data().displayName,
+              photoURL: user.data().photoURL,
+            },
           },
+          ...prev,
         ]);
       }
     } catch (err) {
       console.log("eruare");
       console.log(err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // useEffect(() => {
-  //   async function getMemes() {
-  //     try {
-  //       const memesSnapshot = await getDocs(query(collection(db, "memes"), orderBy("createdAt", "desc")));
-
-  //       for (const entry of memesSnapshot.docs) {
-  //         const memeUser = await getDoc(entry.data().user);
-
-  //         setMemes(prev => [
-  //           ...prev,
-  //           {
-  //             id: entry.id,
-  //             url: entry.data().url,
-  //             createdAt: entry.data().createdAt,
-  //             user: { displayName: memeUser.data().displayName, photoURL: memeUser.data().photoURL },
-  //           },
-  //         ]);
-  //       }
-  //     } catch (err) {
-  //       console.log("eruare");
-  //       console.log(err);
-  //     }
-  //   }
-
-  //   getMemes();
-  // }, []);
-
   const value = {
     memes,
+    loading,
     setMemes,
     addMeme,
     getMemes,
